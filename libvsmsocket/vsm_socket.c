@@ -26,6 +26,7 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 	int opt_val = 1;
 	int stat;
 
+	vsm_sock->in = NULL;
 	vsm_sock->out = NULL;
 	memset(&vsm_sock->server_addr, 0, sizeof(vsm_sock->server_addr));
 	memset(&vsm_sock->client_addr, 0, sizeof(vsm_sock->client_addr));
@@ -64,6 +65,16 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 	return 0;
 }
 
+void vsm_socket_free(struct vsm_socket *vsm_sock)
+{
+	vsm_socket_close(vsm_sock);
+
+	if (vsm_sock->server_fd >= 0) {
+		close(vsm_sock->server_fd);
+		vsm_sock->server_fd = -1;
+	}
+}
+
 int vsm_socket_accept(struct vsm_socket *vsm_sock)
 {
 	socklen_t client_len = sizeof(vsm_sock->client_addr);
@@ -77,8 +88,10 @@ int vsm_socket_accept(struct vsm_socket *vsm_sock)
 		return -1;
 
 	vsm_sock->out = fdopen(client_fd, "w");
+	client_fd = dup(client_fd);
+	vsm_sock->in = fdopen(client_fd, "r");
 
-	if (vsm_sock->out == NULL)
+	if ((vsm_sock->out == NULL) || (vsm_sock->in == NULL))
 		return -1;
 
 	return 0;
@@ -91,9 +104,9 @@ void vsm_socket_close(struct vsm_socket *vsm_sock)
 		vsm_sock->out = NULL;
 	}
 
-	if (vsm_sock->server_fd >= 0) {
-		close(vsm_sock->server_fd);
-		vsm_sock->server_fd = -1;
+	if (vsm_sock->in != NULL) {
+		fclose(vsm_sock->in);
+		vsm_sock->in = NULL;
 	}
 }
 
@@ -121,4 +134,53 @@ int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg)
 		return -1;
 
 	return fflush(vsm_sock->out);
+}
+
+static char *vsm_trim(char *str)
+{
+	char *ret = str;
+
+	for (ret = str; *ret == ' '; ++ret);
+
+	for (str = ret; *str != '\0'; ++str)
+		if ((*str == '\n') || (*str == ' '))
+			*str = '\0';
+
+	return ret;
+}
+
+int vsm_socket_receive(struct vsm_socket *vsm_sock,
+		       const char **signal, const char **value)
+{
+	static const char delim[] = "=";
+	const int buffer_size = (int)vsm_sock->buffer_size;
+	char *ptr;
+	char *str;
+	char *tok_signal;
+	char *tok_value;
+
+	if (vsm_sock->in == NULL)
+		return -1;
+
+	str = fgets(vsm_sock->buffer, buffer_size, vsm_sock->in);
+
+	if (str == NULL) {
+		if (feof(vsm_sock->in)) {
+			*signal = *value = NULL;
+			return 0;
+		} else {
+			return -1;
+		}
+	}
+
+	tok_signal = strtok_r(str, delim, &ptr);
+	tok_value = strtok_r(NULL, delim, &ptr);
+
+	if ((tok_signal == NULL) || (tok_value == NULL))
+		return -1;
+
+	*signal = vsm_trim(tok_signal);
+	*value = vsm_trim(tok_value);
+
+	return 0;
 }
