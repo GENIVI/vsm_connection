@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 
@@ -28,6 +29,7 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 
 	vsm_sock->in = NULL;
 	vsm_sock->out = NULL;
+	vsm_sock->read_fd = -1;
 	memset(&vsm_sock->server_addr, 0, sizeof(vsm_sock->server_addr));
 	memset(&vsm_sock->client_addr, 0, sizeof(vsm_sock->client_addr));
 	vsm_sock->buffer = buffer;
@@ -89,6 +91,7 @@ int vsm_socket_accept(struct vsm_socket *vsm_sock)
 
 	vsm_sock->out = fdopen(client_fd, "w");
 	client_fd = dup(client_fd);
+	vsm_sock->read_fd = client_fd;
 	vsm_sock->in = fdopen(client_fd, "r");
 
 	if ((vsm_sock->out == NULL) || (vsm_sock->in == NULL))
@@ -112,6 +115,7 @@ void vsm_socket_close(struct vsm_socket *vsm_sock)
 	if (vsm_sock->in != NULL) {
 		fclose(vsm_sock->in);
 		vsm_sock->in = NULL;
+		vsm_sock->read_fd = -1;
 	}
 }
 
@@ -152,6 +156,22 @@ static char *vsm_trim(char *str)
 			*str = '\0';
 
 	return ret;
+}
+
+int vsm_socket_select(int fd)
+{
+	fd_set fds;
+	int status;
+
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+
+	status = select(fd + 1, &fds, NULL, NULL, NULL);
+
+	if (status <= 0)
+		return -1;
+
+	return 0;
 }
 
 int vsm_socket_receive(struct vsm_socket *vsm_sock,

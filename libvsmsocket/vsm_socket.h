@@ -21,6 +21,7 @@
  */
 struct vsm_socket {
 	int server_fd;
+	int read_fd;
 	FILE *out;
 	FILE *in;
 	struct sockaddr_in server_addr;
@@ -82,6 +83,24 @@ extern int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
  * here, this can be used to send an arbitrary string to the VSM client.
  */
 extern int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg);
+
+/* Call the libc select() function to wait for incoming connection or data
+ *
+ * This is primarily useful in a multi-threaded context as it doesn't need to
+ * be protected by a lock.  When not using threads, this can be ignored.
+ *
+ * First get the value of either vsm_sock->server_fd or vsm_sock->client_fd
+ * while holding a lock to guarantee the instance is not being freed at the
+ * same time.  Then call vsm_socket_select with the chosen file descriptor,
+ * without the need to hold a lock.  If the file descriptor got closed by
+ * another thread, it will return -1.  Then vsm_socket_select() returns, hold
+ * the lock again to call other vsm_socket_ functions.
+ *
+ * Use server_fd to wait for an incoming connection before calling
+ * vsm_sock_accept(), or with read_fd after accepting a client connection to
+ * wait for any incoming data before calling vsm_socket_receive().
+ */
+extern int vsm_socket_select(int fd);
 
 /* Receive a signal and its value
  *
