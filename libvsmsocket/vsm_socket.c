@@ -133,6 +133,19 @@ int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
 	return fflush(vsm_sock->out);
 }
 
+int vsm_socket_send_float(struct vsm_socket *vsm_sock,
+			  const char *signal, double value)
+{
+	int stat;
+
+	stat = fprintf(vsm_sock->out, "%s=%f\n", signal, value);
+
+	if (stat < 0)
+		return -1;
+
+	return fflush(vsm_sock->out);
+}
+
 int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg)
 {
 	int stat;
