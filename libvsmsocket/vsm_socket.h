@@ -77,6 +77,14 @@ extern void vsm_socket_close(struct vsm_socket *vsm_sock);
 extern int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
 				const char *signal, int value);
 
+/* Send an integer signal to the VSM client
+ *
+ * Send a signal with the given name and integer value to the active VSM
+ * client.
+ */
+extern int vsm_socket_send_int(struct vsm_socket *vsm_sock,
+			       const char *signal, int value);
+
 /* Send a floating point signal to the VSM client
  *
  * Send a signal with the given name and floating point value to the active VSM
@@ -84,6 +92,13 @@ extern int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
  */
 extern int vsm_socket_send_float(struct vsm_socket *vsm_sock,
 				 const char *signal, double value);
+
+/* Send a string signal to the VSM client
+ *
+ * Send a signal with the given name and string value to the active VSM client.
+ */
+extern int vsm_socket_send_str(struct vsm_socket *vsm_sock,
+			       const char *signal, const char *value);
 
 /* Send any arbitrary string
  *

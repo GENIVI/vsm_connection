@@ -14,8 +14,9 @@
 
 #include "vsm_socket.h"
 
-#include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
 #include <unistd.h>
@@ -119,13 +120,14 @@ void vsm_socket_close(struct vsm_socket *vsm_sock)
 	}
 }
 
-int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
-			 const char *signal, int value)
+static int vsm_socket_printf(struct vsm_socket *vsm_sock, const char *fmt, ...)
 {
+	va_list args;
 	int stat;
 
-	stat = fprintf(vsm_sock->out, "%s=%s\n",
-		       signal, value ? "True" : "False");
+	va_start(args, fmt);
+	stat = vfprintf(vsm_sock->out, fmt, args);
+	va_end(args);
 
 	if (stat < 0)
 		return -1;
@@ -133,17 +135,29 @@ int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
 	return fflush(vsm_sock->out);
 }
 
+int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
+			 const char *signal, int value)
+{
+	return vsm_socket_printf(vsm_sock, "%s=%s\n",
+				 signal, value ? "True" : "False");
+}
+
+int vsm_socket_send_int(struct vsm_socket *vsm_sock,
+			const char *signal, int value)
+{
+	return vsm_socket_printf(vsm_sock, "%s=%d\n", signal, value);
+}
+
 int vsm_socket_send_float(struct vsm_socket *vsm_sock,
 			  const char *signal, double value)
 {
-	int stat;
+	return vsm_socket_printf(vsm_sock, "%s=%f\n", signal, value);
+}
 
-	stat = fprintf(vsm_sock->out, "%s=%f\n", signal, value);
-
-	if (stat < 0)
-		return -1;
-
-	return fflush(vsm_sock->out);
+int vsm_socket_send_str(struct vsm_socket *vsm_sock,
+			const char *signal, const char *value)
+{
+	return vsm_socket_printf(vsm_sock, "%s=%s\n", signal, value);
 }
 
 int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg)
