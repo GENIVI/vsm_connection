@@ -97,6 +97,11 @@ int vsm_socket_accept(struct vsm_socket *vsm_sock)
 	return 0;
 }
 
+int vsm_socket_is_open(struct vsm_socket *vsm_sock)
+{
+	return vsm_sock->out != NULL;
+}
+
 void vsm_socket_close(struct vsm_socket *vsm_sock)
 {
 	if (vsm_sock->out != NULL) {

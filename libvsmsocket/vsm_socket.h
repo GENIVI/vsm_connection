@@ -52,6 +52,14 @@ extern void vsm_socket_free(struct vsm_socket *vsm_sock);
  */
 extern int vsm_socket_accept(struct vsm_socket *vsm_sock);
 
+/* Check if the VSM client is connected
+ *
+ * Only one client can be connected at any given point in time.  This can be
+ * used to check whether a client connection has been accepted and has not been
+ * closed yet.
+ */
+extern int vsm_socket_is_open(struct vsm_socket *vsm_sock);
+
 /* Close the VSM client connection
  *
  * Close any open client socket and free any associated resources.  The server
