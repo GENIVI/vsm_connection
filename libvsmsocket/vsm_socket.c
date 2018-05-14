@@ -9,6 +9,9 @@
     Guillaume Tucker <guillaume.tucker@collabora.com>
 */
 
+/* Needed for fdopen in particular */
+#define _POSIX_C_SOURCE 1
+
 #include "vsm_socket.h"
 
 #include <stdlib.h>
@@ -16,14 +19,14 @@
 #include <string.h>
 #include <unistd.h>
 
+
 int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 		    char *buffer, size_t buffer_size)
 {
 	int opt_val = 1;
-	int status;
+	int stat;
 
-	vsm_sock->server_fd = -1;
-	vsm_sock->client_fd = -1;
+	vsm_sock->out = NULL;
 	memset(&vsm_sock->server_addr, 0, sizeof(vsm_sock->server_addr));
 	memset(&vsm_sock->client_addr, 0, sizeof(vsm_sock->client_addr));
 	vsm_sock->buffer = buffer;
@@ -31,9 +34,8 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 
 	vsm_sock->server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-	if (vsm_sock->server_fd < 0) {
+	if (vsm_sock->server_fd < 0)
 		return -1;
-	}
 
 	vsm_sock->server_addr.sin_family = AF_INET;
 	vsm_sock->server_addr.sin_port = htons(port);
@@ -41,19 +43,21 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 	setsockopt(vsm_sock->server_fd, SOL_SOCKET, SO_REUSEADDR,
 		   &opt_val, sizeof(opt_val));
 
-	status = bind(vsm_sock->server_fd,
-		      (struct sockaddr *) &vsm_sock->server_addr,
-		      sizeof(vsm_sock->server_addr));
+	stat = bind(vsm_sock->server_fd,
+		    (struct sockaddr *) &vsm_sock->server_addr,
+		    sizeof(vsm_sock->server_addr));
 
-	if (status < 0) {
+	if (stat < 0) {
 		close(vsm_sock->server_fd);
+		vsm_sock->server_fd = -1;
 		return -1;
 	}
 
-	status = listen(vsm_sock->server_fd, 1);
+	stat = listen(vsm_sock->server_fd, 1);
 
-	if (status < 0) {
+	if (stat < 0) {
 		close(vsm_sock->server_fd);
+		vsm_sock->server_fd = -1;
 		return -1;
 	}
 
@@ -63,24 +67,28 @@ int vsm_socket_init(struct vsm_socket *vsm_sock, unsigned port,
 int vsm_socket_accept(struct vsm_socket *vsm_sock)
 {
 	socklen_t client_len = sizeof(vsm_sock->client_addr);
+	int client_fd;
 
-	vsm_sock->client_fd = accept(vsm_sock->server_fd,
-				     (struct sockaddr *) &vsm_sock->client_addr,
-				     &client_len);
+	client_fd = accept(vsm_sock->server_fd,
+			   (struct sockaddr *) &vsm_sock->client_addr,
+			   &client_len);
 
-	if (vsm_sock->client_fd < 0) {
-		close(vsm_sock->server_fd);
+	if (client_fd < 0)
 		return -1;
-	}
+
+	vsm_sock->out = fdopen(client_fd, "w");
+
+	if (vsm_sock->out == NULL)
+		return -1;
 
 	return 0;
 }
 
 void vsm_socket_close(struct vsm_socket *vsm_sock)
 {
-	if (vsm_sock->client_fd >= 0) {
-		close(vsm_sock->client_fd);
-		vsm_sock->client_fd = -1;
+	if (vsm_sock->out != NULL) {
+		fclose(vsm_sock->out);
+		vsm_sock->out = NULL;
 	}
 
 	if (vsm_sock->server_fd >= 0) {
@@ -92,34 +100,25 @@ void vsm_socket_close(struct vsm_socket *vsm_sock)
 int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
 			 const char *signal, int value)
 {
-	int status;
+	int stat;
 
-	status = snprintf(vsm_sock->buffer, vsm_sock->buffer_size, "%s=%s\n",
-			  signal, value ? "True" : "False");
+	stat = fprintf(vsm_sock->out, "%s=%s\n",
+		       signal, value ? "True" : "False");
 
-	if (status >= vsm_sock->buffer_size)
+	if (stat < 0)
 		return -1;
 
-	return vsm_socket_send(vsm_sock);
+	return fflush(vsm_sock->out);
 }
 
-int vsm_socket_send(struct vsm_socket *vsm_sock)
+int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg)
 {
-	size_t len;
+	int stat;
 
-	vsm_sock->buffer[vsm_sock->buffer_size - 1] = '\0';
-	len = strlen(vsm_sock->buffer);
+	stat = fputs(msg, vsm_sock->out);
 
-	while (len) {
-		ssize_t sent;
+	if (stat < 0)
+		return -1;
 
-		sent = send(vsm_sock->client_fd, vsm_sock->buffer, len, 0);
-
-		if (sent < 0)
-			return -1;
-
-		len -= (size_t)sent;
-	}
-
-	return 0;
+	return fflush(vsm_sock->out);
 }

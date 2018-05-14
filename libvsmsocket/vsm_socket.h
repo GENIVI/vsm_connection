@@ -13,6 +13,7 @@
 #define INCLUDE_VSM_SOCKET_H 1
 
 #include <netinet/in.h>
+#include <stdio.h>
 
 /* VSM connection instance data
  *
@@ -20,7 +21,7 @@
  */
 struct vsm_socket {
 	int server_fd;
-	int client_fd;
+	FILE *out;
 	struct sockaddr_in server_addr;
 	struct sockaddr_in client_addr;
 	char *buffer;
@@ -57,12 +58,11 @@ extern void vsm_socket_close(struct vsm_socket *vsm_sock);
 extern int vsm_socket_send_bool(struct vsm_socket *vsm_sock,
 				const char *signal, int value);
 
-/* Send any arbitrary data currently stored in the buffer
+/* Send any arbitrary string
  *
  * For any other type of signal not covered by the generic functions provided
- * here, this can be used to send an arbitrary string stored in the connection
- * buffer.
+ * here, this can be used to send an arbitrary string to the VSM client.
  */
-extern int vsm_socket_send(struct vsm_socket *vsm_sock);
+extern int vsm_socket_send(struct vsm_socket *vsm_sock, const char *msg);
 
 #endif /* INCLUDE_VSM_SOCKET_H */
