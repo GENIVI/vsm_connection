@@ -204,20 +204,26 @@ int vsm_socket_select(int fd)
 int vsm_socket_receive(struct vsm_socket *vsm_sock,
 		       const char **signal, const char **value)
 {
+	if (vsm_sock->in == NULL)
+		return -1;
+
+	return vsm_socket_fread(vsm_sock->in, vsm_sock->buffer,
+				vsm_sock->buffer_size, signal, value);
+}
+
+int vsm_socket_fread(FILE *in, char *buffer, size_t buffer_size,
+		     const char **signal, const char **value)
+{
 	static const char delim[] = "=";
-	const int buffer_size = (int)vsm_sock->buffer_size;
 	char *ptr;
 	char *str;
 	char *tok_signal;
 	char *tok_value;
 
-	if (vsm_sock->in == NULL)
-		return -1;
-
-	str = fgets(vsm_sock->buffer, buffer_size, vsm_sock->in);
+	str = fgets(buffer, buffer_size, in);
 
 	if (str == NULL) {
-		if (feof(vsm_sock->in)) {
+		if (feof(in)) {
 			*signal = *value = NULL;
 			return 0;
 		} else {

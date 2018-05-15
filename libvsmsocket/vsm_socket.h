@@ -139,4 +139,13 @@ extern int vsm_socket_select(int fd);
 extern int vsm_socket_receive(struct vsm_socket *vsm_sock,
 			      const char **signal, const char **value);
 
+/* Read a signal from an arbitrary FILE input stream
+ *
+ * Do the same as vsm_socket_receive but using an arbitrary FILE input stream
+ * and buffer rather than a vsm_socket instance.  This is primarily useful when
+ * reading signals from an alternative input stream, such as stdin.
+ */
+extern int vsm_socket_fread(FILE *in, char *buffer, size_t buffer_size,
+			    const char **signal, const char **value);
+
 #endif /* INCLUDE_VSM_SOCKET_H */
